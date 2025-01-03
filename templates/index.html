@@ -143,6 +143,45 @@
             100% { transform: rotate(360deg); }
         }
 
+        .hint-btn {
+            background-color: #34a853;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+            margin-right: 10px;
+        }
+
+        .hint-btn:hover {
+            background-color: #2d8e47;
+        }
+
+        .hint-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .hint-cell {
+            background-color: #e8f0fe !important;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
         @media (max-width: 400px) {
             .cell {
                 width: 80px;
@@ -190,7 +229,10 @@
             <button class="cell" data-index="7"></button>
             <button class="cell" data-index="8"></button>
         </div>
-        <button class="reset-btn" onclick="resetGame()">New Game</button>
+        <div class="button-container">
+            <button class="hint-btn" onclick="getHint()">Get AI Hint</button>
+            <button class="reset-btn" onclick="resetGame()">New Game</button>
+        </div>
     </div>
 
     <!-- Audio elements -->
@@ -202,6 +244,7 @@
         let board = Array(9).fill(' ');
         let gameActive = true;
         let isAIThinking = false;
+        let currentHintCell = null;
         let scores = {
             player: 0,
             computer: 0
@@ -216,9 +259,87 @@
             cell.addEventListener('click', () => handleCellClick(cell));
         });
 
+        async function getHint() {
+            if (!gameActive || isAIThinking) return;
+
+            const hintBtn = document.querySelector('.hint-btn');
+            hintBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/get_hint', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ board: board })
+                });
+                
+                const data = await response.json();
+                
+                // Remove previous hint if exists
+                if (currentHintCell !== null) {
+                    document.querySelector(`[data-index="${currentHintCell}"]`).classList.remove('hint-cell');
+                }
+                
+                // Show new hint
+                const hintCell = document.querySelector(`[data-index="${data.recommended_move}"]`);
+                hintCell.classList.add('hint-cell');
+                currentHintCell = data.recommended_move;
+                
+                // Add click event for hint cell
+                const makeHintMove = () => {
+                    if (gameActive && !isAIThinking) {
+                        handleCellClick(hintCell);
+                        hintCell.classList.remove('hint-cell');
+                        currentHintCell = null;
+                    }
+                };
+                
+                hintCell.addEventListener('click', makeHintMove, { once: true });
+                
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hintBtn.disabled = false;
+            }
+        }
+
+        function isPossibleWin() {
+            const winningCombos = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6] // Diagonals
+            ];
+
+            // Try each empty position for both X and O
+            for (let combo of winningCombos) {
+                let emptyCount = 0;
+                let xCount = 0;
+                let oCount = 0;
+
+                for (let pos of combo) {
+                    if (board[pos] === ' ') emptyCount++;
+                    if (board[pos] === 'X') xCount++;
+                    if (board[pos] === 'O') oCount++;
+                }
+
+                // If there's a potential win (2 same symbols and 1 empty)
+                if ((xCount === 2 && emptyCount === 1) || (oCount === 2 && emptyCount === 1)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         async function handleCellClick(cell) {
             const index = cell.dataset.index;
             if (board[index] !== ' ' || !gameActive || isAIThinking) return;
+
+            // Remove hint if exists
+            if (currentHintCell !== null) {
+                document.querySelector(`[data-index="${currentHintCell}"]`).classList.remove('hint-cell');
+                currentHintCell = null;
+            }
 
             // Player's move
             clickSound.play();
@@ -235,8 +356,8 @@
                 return;
             }
 
-            // Check if board is full
-            if (isBoardFull()) {
+            // Check if it's a draw (no possible wins)
+            if (!isPossibleWin()) {
                 document.getElementById('status').textContent = "It's a draw!";
                 gameActive = false;
                 drawSound.play();
