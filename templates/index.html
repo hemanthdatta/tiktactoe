@@ -356,19 +356,20 @@
                 return;
             }
 
-            // Check if it's a draw (no possible wins)
-            if (!isPossibleWin()) {
-                document.getElementById('status').textContent = "It's a draw!";
-                gameActive = false;
-                drawSound.play();
-                return;
-            }
-
+            // Count empty squares
+            const emptySquares = board.filter(square => square === ' ').length;
+            
             // AI's turn
             if (gameActive) {
                 isAIThinking = true;
                 document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
-                document.getElementById('status').innerHTML = "AI is thinking... <div class='loading'></div>";
+                
+                // If only one move left, show "Thinking about last move..."
+                if (emptySquares === 1) {
+                    document.getElementById('status').innerHTML = "Thinking about last move... <div class='loading'></div>";
+                } else {
+                    document.getElementById('status').innerHTML = "AI is thinking... <div class='loading'></div>";
+                }
                 
                 // Make API call for computer's move
                 try {

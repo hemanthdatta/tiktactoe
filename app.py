@@ -19,28 +19,6 @@ def is_board_full(board):
 def get_empty_squares(board):
     return [i for i, x in enumerate(board) if x == ' ']
 
-def is_possible_win(board):
-    # Check if there's any possible way to win for either player
-    empty_positions = get_empty_squares(board)
-    
-    # Try each empty position for both X and O
-    for pos in empty_positions:
-        # Try X
-        board[pos] = 'X'
-        if is_winner(board, 'X'):
-            board[pos] = ' '
-            return True
-        
-        # Try O
-        board[pos] = 'O'
-        if is_winner(board, 'O'):
-            board[pos] = ' '
-            return True
-            
-        board[pos] = ' '
-    
-    return False
-
 def minimax(board, depth, is_maximizing):
     if is_winner(board, 'O'):
         return 1
@@ -96,11 +74,15 @@ def make_move():
             'status': 'player_wins'
         })
     
-    # Check if it's already a draw (no possible wins)
-    if not is_possible_win(board):
+    # Count empty squares
+    empty_squares = get_empty_squares(board)
+    if len(empty_squares) == 1:
+        # If only one move left and no one has won, it's definitely a draw
+        board[empty_squares[0]] = 'O'  # Make the last move
         return jsonify({
             'board': board,
-            'status': 'draw'
+            'status': 'draw',
+            'computer_move': empty_squares[0]
         })
     
     # Make computer's move
@@ -112,7 +94,7 @@ def make_move():
     status = 'ongoing'
     if is_winner(board, 'O'):
         status = 'computer_wins'
-    elif not is_possible_win(board):
+    elif is_board_full(board):
         status = 'draw'
     
     return jsonify({
