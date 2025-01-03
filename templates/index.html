@@ -87,6 +87,11 @@
             color: #1a73e8;
         }
 
+        .cell.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
         .cell:hover {
             background-color: #e8f0fe;
             transform: scale(1.05);
@@ -120,6 +125,22 @@
 
         .reset-btn:hover {
             background-color: #1557b0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #1a73e8;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 400px) {
@@ -180,6 +201,7 @@
     <script>
         let board = Array(9).fill(' ');
         let gameActive = true;
+        let isAIThinking = false;
         let scores = {
             player: 0,
             computer: 0
@@ -196,16 +218,36 @@
 
         async function handleCellClick(cell) {
             const index = cell.dataset.index;
-            if (board[index] !== ' ' || !gameActive) return;
+            if (board[index] !== ' ' || !gameActive || isAIThinking) return;
 
             // Player's move
             clickSound.play();
             board[index] = 'X';
             updateBoard();
 
-            // Check if game is over after player's move
+            // Check if player wins
+            if (checkWin('X')) {
+                document.getElementById('status').textContent = "You win!";
+                gameActive = false;
+                scores.player++;
+                updateScores();
+                winSound.play();
+                return;
+            }
+
+            // Check if board is full
+            if (isBoardFull()) {
+                document.getElementById('status').textContent = "It's a draw!";
+                gameActive = false;
+                drawSound.play();
+                return;
+            }
+
+            // AI's turn
             if (gameActive) {
-                document.getElementById('status').textContent = "AI is thinking...";
+                isAIThinking = true;
+                document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
+                document.getElementById('status').innerHTML = "AI is thinking... <div class='loading'></div>";
                 
                 // Make API call for computer's move
                 try {
@@ -245,8 +287,26 @@
                 } catch (error) {
                     console.error('Error:', error);
                     document.getElementById('status').textContent = "An error occurred!";
+                } finally {
+                    isAIThinking = false;
+                    document.querySelectorAll('.cell').forEach(c => c.classList.remove('disabled'));
                 }
             }
+        }
+
+        function checkWin(player) {
+            const winningCombos = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6] // Diagonals
+            ];
+            return winningCombos.some(combo => 
+                combo.every(index => board[index] === player)
+            );
+        }
+
+        function isBoardFull() {
+            return !board.includes(' ');
         }
 
         function updateBoard() {
@@ -264,7 +324,9 @@
         function resetGame() {
             board = Array(9).fill(' ');
             gameActive = true;
+            isAIThinking = false;
             document.getElementById('status').textContent = "Your turn! (X)";
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('disabled'));
             updateBoard();
             clickSound.play();
         }
